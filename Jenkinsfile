@@ -2,11 +2,25 @@ pipeline {
     agent any
     environment {
         MAVEN_HOME = tool 'Maven'
+        SONAR_PROJECT_KEY = 'Gestion-biblio'
+		SONAR_SCANNER_HOME = tool 'SonarQubeScanner'
     }
     stages {
-        stage('Checkout') {
+        stage('checkout') {
             steps {
-                git 'https://github.com/votre-depot/GestionBibliotheque.git'
+                withCredentials([string(credentialsId: 'github-pat', variable: 'GITHUB_PAT')]) {
+                script {
+                    if (fileExists('Gestion-biblio')) {
+                        dir('Gestion-biblio') {
+                            sh "git reset --hard"
+                            sh "git clean -fd"
+                            sh "git pull origin main"
+                        }
+                    } else {
+                        sh "git clone https://${GITHUB_PAT}@github.com/Kakolako123/Gestion-biblio.git"
+                    }
+                }
+                }
             }
         }
         stage('Build') {
@@ -21,10 +35,17 @@ pipeline {
         }
         stage('Quality Analysis') {
             steps {
-                withSonarQubeEnv('SonarQube') {
-                    sh '${MAVEN_HOME}/bin/mvn sonar:sonar'
-                }
-            }
+				withCredentials([string(credentialsId: 'SonarQube-library-management-token', variable: 'SONAR_TOKEN')]) {
+
+					withSonarQubeEnv('SonarQube') {
+						sh """
+                             mvn sonar:sonar \
+                            -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
+                            -Dsonar.login=${SONAR_TOKEN}
+                    	"""
+					}
+				}
+			}
         }
         stage('Deploy') {
             steps {
@@ -34,12 +55,12 @@ pipeline {
     }
     post {
         success {
-            emailext to: 'votre-email@example.com',
+            mail to: 'kawtar.zouiher.02@gmail.com',
                 subject: 'Build Success',
                 body: 'Le build a été complété avec succès.'
         }
         failure {
-            emailext to: 'votre-email@example.com',
+            mail to: 'kawtar.zouiher.02@gmail.com',
                 subject: 'Build Failed',
                 body: 'Le build a échoué.'
         }
